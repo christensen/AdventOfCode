@@ -5,6 +5,11 @@
 #include <regex>
 #include <cctype>
 
+void log(const std::string& output)
+{
+    std::cout << output << std::endl;
+}
+
 auto populateVector(const std::string& filename)
 {
     std::ifstream file(filename);
@@ -22,64 +27,6 @@ auto populateVector(const std::string& filename)
     return v;
 }
 
-int findMatchesAbove(std::string& row, const std::string& above)
-{
-    std::regex numberRegex("\\d+");
-
-    std::sregex_iterator iterator(row.begin(), row.end(), numberRegex);
-    std::sregex_iterator end;
-
-    int result = 0;
-
-    while (iterator != end) {
-        std::smatch match = *iterator;
-        int position = match.position();
-
-        std::cout << "Match at position " << position << ": " << match.str() << std::endl;
-
-        std::string dots(match.str().length(), '.');
-
-        if (position - 1 > 0) {
-            char cDiagonalLeftAbove = above[position - 1];
-            std::cout << cDiagonalLeftAbove << std::endl;
-            if (cDiagonalLeftAbove != '.' && ispunct(cDiagonalLeftAbove)) {
-                std::cout << "HEY NICE! VALID NUMBER MATCH ABOVE BEFORE: " << match.str() << std::endl;
-                result += std::stoi(match.str());
-                row.replace(position, match.str().length(), dots);
-                ++iterator;
-                continue;
-            }
-        }
-
-        if (position + match.str().length() < row.length()) {
-            char cDiagonalRightAbove = above[position + match.str().length()];
-            std::cout << cDiagonalRightAbove << std::endl;
-            if (cDiagonalRightAbove != '.' && ispunct(cDiagonalRightAbove)) {
-                std::cout << "HEY NICE! VALID NUMBER MATCH ABOVES AFTER: " << match.str() << std::endl;
-                result += std::stoi(match.str());
-                row.replace(position, match.str().length(), dots);
-                ++iterator;
-                continue;
-            }
-        }
-
-        for (int i = position; i < position + match.str().length(); ++i) {
-            char c = above[i];
-            std::cout << c << std::endl;
-            if (c != '.' && ispunct(c)) {
-                std::cout << "HEY NICE! VALID NUMBER MATCH DIRECTLY ABOVE: " << match.str() << std::endl;
-                result += std::stoi(match.str());
-                row.replace(position, match.str().length(), dots);
-                break;
-            }
-        }
-        ++iterator;
-        std::cout << std::endl;
-    }
-
-    return result;
-}
-
 int findMatchesOnSameRow(std::string& row)
 {
     std::regex numberRegex("\\d+");
@@ -92,35 +39,23 @@ int findMatchesOnSameRow(std::string& row)
     while (iterator != end) {
         std::smatch match = *iterator;
         int position = match.position();
-
+        bool incrementedIt = false;
         std::cout << "Match at position " << position << ": " << match.str() << std::endl;
-
-        std::string dots(match.str().length(), '.');
-
-         if (position - 1 > 0) {
-            char cBefore = row[position - 1];
-            std::cout << cBefore << std::endl;
-            if (cBefore != '.' && ispunct(cBefore)) {
-                std::cout << "HEY NICE! VALID NUMBER MATCH BELOW BEFORE: " << match.str() << std::endl;
-                result += std::stoi(match.str());
-                row.replace(position, match.str().length(), dots);
-                // skip next check if we found it...
-                ++iterator;
-                continue;
+        if (position + match.str().length() < row.length()) {
+            int potentialMultiplierPos = position + match.str().length();
+            char cAfter = row[potentialMultiplierPos];
+            if (cAfter == '*') {
+                incrementedIt = true;
+                if (++iterator != end) {
+                    if ((*iterator).position() - 1 == potentialMultiplierPos) {
+                        result += (std::stoi(match.str()) * std::stoi((*iterator).str()));
+                    }
+                }
             }
-         }
-
-         if (position + match.str().length() < row.length()) {
-            char cAfter = row[position + match.str().length()];
-            std::cout << cAfter << std::endl;
-            if (cAfter != '.' && ispunct(cAfter)) {
-                std::cout << "HEY NICE! VALID NUMBER MATCH BELOW AFTER: " << match.str() << std::endl;
-                result += std::stoi(match.str());
-                row.replace(position, match.str().length(), dots);
-            }
-         }
-         ++iterator;
-         std::cout << std::endl;
+        }
+        if (!incrementedIt) {
+            ++iterator;
+        }
     }
 
     return result;
@@ -140,43 +75,75 @@ int findNumbersGettingMultiplied(const std::string& first, const std::string& se
         std::smatch match = *iterator;
         int position = match.position();
 
-        std::cout << "Match at position " << position << ": " << match.str() << std::endl;
+        firstNumber = std::stoi(match.str());
 
-        std::string dots(match.str().length(), '.');
+        int diagonalLeftPosition = position - 1;
+        int diagonalRightPosition = position + match.str().length();
 
-        if (position - 1 > 0) {
-            int wantedPosition = position - 1;
-            char cDiagonalLeftBelow = second[wantedPosition];
-            if (cDiagonalLeftBelow == '*') {
-                firstNumber += std::stoi(match.str());
-                while (thirdLineIterator != end) {
-                    std::smatch thirdLineMatch = *iterator;
-                    int p = thirdLineMatch.position();
-                    if (p == position || p > position - 1 - thirdLineMatch.str().length())
-                        std::cout << "FOUND A MATCH THAT WE SHOULD MULTIPLY!" << std::endl;
-                    ++thirdLineIterator;
+        char cDiagonalLeftBelow = second[diagonalLeftPosition];
+        char cDiagonalRightBelow = second[diagonalRightPosition];
+        
+        int mulitplierPos = -1;
+
+        if (cDiagonalLeftBelow == '*')
+            mulitplierPos = diagonalLeftPosition;
+        else if (cDiagonalRightBelow == '*')
+            mulitplierPos = diagonalRightPosition;
+        else {
+            for (int i = position; i < position + match.str().length(); ++i) {
+                char c = second[i];
+                if (c == '*') {
+                    mulitplierPos = i;
+                    break;
                 }
-                ++iterator;
-                continue;
             }
         }
+        if (mulitplierPos != -1) {
+            log("Match on line 1: " + match.str() + " at position " + std::to_string(position));
+            // log("Found a multiplier sign at position " + std::to_string(mulitplierPos));
+            int thirdLinePos = 0;
+            while (thirdLineIterator != end) {
+                std::smatch thirdLineMatch = *thirdLineIterator;
+                thirdLinePos = thirdLineMatch.position();
+                if (thirdLinePos > position + match.str().length() + 1) {
+                    log("Third line position became too great, position " +
+                        std::to_string(position) + " third line position " +
+                        std::to_string(thirdLinePos + 1));
+                    break;
+                }
+                log("Match on line 3: " + thirdLineMatch.str() + " at position " + std::to_string(thirdLinePos));
+                bool matchFound = false;
+                if (thirdLinePos + thirdLineMatch.str().length() == mulitplierPos) {
+                    log("match diagonal left");
+                    matchFound = true;
+                }
+                else if (thirdLinePos - 1 == mulitplierPos) {
+                    log("match diagonal right");
+                    matchFound = true;
+                }
+                
+                for (int i = 0; i < thirdLineMatch.str().length() - 1; ++i) {
+                    if (thirdLinePos == mulitplierPos - i) {
+                        log("match underneath");
+                        matchFound = true;
+                        break;
+                    }
+                }
 
-        // if (position + match.str().length() < row.length()) {
-        //     char cDiagonalRightBelow = second[position + match.str().length()];
-        //     if (cDiagonalRightBelow == '*') {
-        //         firstNumber += std::stoi(match.str());
-        //         ++iterator;
-        //         continue;
-        //     }
-        // }
-
-        // for (int i = position; i < position + match.str().length(); ++i) {
-        //     char c = second[i];
-        //     if (c == '*') {
-        //         firstNumber += std::stoi(match.str());
-        //         break;
-        //     }
-        // }
+                if (matchFound) {
+                    int thirdNumber = std::stoi(thirdLineMatch.str());
+                    // log("First number: " + std::to_string(firstNumber) +
+                    //     " third number: " + std::to_string(thirdNumber));
+                    log("MATCH!");
+                    log("");
+                    result += firstNumber * thirdNumber;
+                    break;
+                }
+                ++thirdLineIterator;
+            }
+            ++iterator;
+            continue;
+        }
         ++iterator;
     }
 
@@ -187,17 +154,20 @@ auto solve(const std::vector<std::string>& engineVec)
 {
     int rowNum = 0;
     int sum = 0;
-    int n = 0;
     for (int i = 0; i < engineVec.size() - 2; ++i) {
         std::string firstLine = engineVec.at(i);
         std::string secondLine = engineVec.at(i+1);
         std::string thirdLine = engineVec.at(i+2);
-
+        log(firstLine);
+        log(secondLine);
+        log(thirdLine);
+        log("");
+        sum += findMatchesOnSameRow(firstLine);
+        if (i == engineVec.size() - 3) {
+            sum += findMatchesOnSameRow(secondLine);
+            sum += findMatchesOnSameRow(thirdLine);
+        }
         sum += findNumbersGettingMultiplied(firstLine, secondLine, thirdLine);
-
-        if (n > 3)
-            break;
-        n++;
     }
     return sum;
 }
@@ -207,7 +177,6 @@ int main()
     std::string filename = "input3.txt";
 
     auto v = populateVector(filename);
-    std::cout << "ENGINE SIZE: " << v.size() << std::endl;
     std::cout << solve(v) << std::endl;
 
     return 0;
