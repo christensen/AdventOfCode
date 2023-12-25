@@ -71,7 +71,7 @@ int solveRecurive(std::vector<std::string>& scratchCards, int num) {
 
     log("matches: " + std::to_string(matches));
 
-    result = 0;
+    int result = 0;
     // Make decision if we should call solveRecursive again!
     result = solveRecurive(scratchCards, matches);
 
